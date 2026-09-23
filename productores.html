@@ -1,1 +1,264 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Ordenar Frases</title>
+  <style>
+    body { font-family: Arial, sans-serif; margin: 10px; background-color: #f4f4f9; }
+    h2, h3 { text-align: center; font-size: 14px; }
+    
+    /* Reservorio con scroll vertical */
+    .deposito {
+      display: flex; flex-wrap: wrap; gap: 5px; justify-content: center;
+      height: 280px; overflow-y: auto; padding: 10px;
+      border: 2px dashed #999; background-color: #fff;
+      margin-bottom: 20px; align-content: flex-start; cursor: pointer;
+    }
+    
+    /* Contenedor de la grilla con scroll horizontal para móviles */
+    .grid-container {
+      width: 100%; overflow-x: auto; padding-bottom: 15px; margin-bottom: 20px;
+    }
+    
+    .grid { display: flex; gap: 3px; min-width: 950px; }
+    .column { display: flex; flex-direction: column; align-items: center; }
+    
+    /* Casilleros más grandes que las frases para evitar cortes */
+    .slot {
+      width: 120px; height: 95px; border: 2px dashed #ccc; margin: 1px;
+      display: flex; align-items: center; justify-content: center;
+      background-color: #f9f9f9; cursor: pointer; box-sizing: border-box; padding: 2px;
+    }
+    
+    /* Tarjetas de las frases */
+    .phrase {
+      width: 110px; min-height: 85px; font-size: 9px; padding: 4px;
+      background-color: #e3f2fd; border: 1px solid #1976d2; border-radius: 5px;
+      cursor: pointer; user-select: none; display: flex; align-items: center;
+      justify-content: center; text-align: center; line-height: 1.2;
+      box-shadow: 0 2px 4px rgba(0,0,0,0.1); box-sizing: border-box;
+    }
+    
+    .phrase.selected {
+      background-color: #ffeb3b; border-color: #f57f17; transform: scale(1.05);
+    }
+    
+    .panel-envio { text-align: center; margin-top: 20px; padding: 15px; background: #fff; border-radius: 8px; }
+    button { padding: 10px 20px; font-size: 16px; background-color: #4CAF50; color: white; border: none; border-radius: 5px; cursor: pointer; }
+    button:disabled { background-color: #ccc; }
+    #codigo-resultado { font-size: 24px; font-weight: bold; color: #d32f2f; margin: 10px 0; letter-spacing: 2px; }
+  </style>
+</head>
+<body>
 
+  <h2>
+    (1) Tocá una frase para seleccionarla (amarillo).<br>
+    (2) Tocá un casillero para ubicarla (o tocá otra tarjeta para intercambiarlas).<br>
+    (3) Para devolverla, tocala y luego tocá el fondo del recuadro punteado.<br>
+    <small><i>Deslizá la grilla hacia los costados si no ves todas las columnas.</i></small>
+  </h2>
+
+  <div class="deposito" id="deposito"></div>
+
+  <h3>Grilla de Ordenación</h3>
+  <div class="grid-container">
+    <div class="grid" id="grid"></div>
+  </div>
+  
+  <div class="panel-envio">
+    <button id="btnEnviar" onclick="enviarDatos()">Guardar Clasificación</button>
+    <div id="loading" style="display:none; margin-top:10px; font-weight:bold;">Guardando datos... aguardá un momento.</div>
+    <div id="resultado-container" style="display:none;">
+      <p>¡Listo! Pegá este código en el Formulario de Google para continuar:</p>
+      <div id="codigo-resultado"></div>
+      <button onclick="copiarCodigo()" style="background-color: #1976d2;">Copiar Código</button>
+    </div>
+  </div>
+
+  <script>
+    const frases = [
+      "La confianza entre los productores y sus asesores o extensionistas es clave para obtener buenos resultados.",
+      "Para innovar, es necesario debatir y pensar junto con personas que tengan distintas ideas y puntos de vista sobre el asunto.",
+      "Los productores no son realmente innovadores, el sector agropecuario es conservador.",
+      "Una producción controlada con agroquímicos garantiza la inocuidad y el abastecimiento de los alimentos.",
+      "Los investigadores tienen el rol de generar tecnologías y conocimientos para innovar.",
+      "Los extensionistas o asesores son responsables de transferir tecnologías y de persuadir a los productores para que las adopten.",
+      "El gobierno no debe meterse con los productores, qué producir y cómo es decisión del productor.",
+      "Hay que estar a la vanguardia de las últimas tecnologías.",
+      "Los productores en general son bastante reacios a innovar.",
+      "Innovar es usar tecnología de punta como drones o agricultura de precisión.",
+      "Pensar siempre en aumentar las ganancias nos está llevando a la destrucción de los ecosistemas.",
+      "El gobierno debe apoyar producciones estratégicas para fomentar el desarrollo nacional.",
+      "Muchas veces los productores adecuan y ajustan las tecnologías disponibles para que les resulten útiles a su situación.",
+      "Aprender a partir de la experiencia es fundamental, no sirven las reuniones que son como clases.",
+      "A los productores les gusta ver y probar cómo funcionan las cosas antes de ponerlas en práctica.",
+      "Los productores son los responsables de traccionar y demandar a asesores o extensionistas para que respondan a sus necesidades.",
+      "Las tecnologías ya están disponibles, los asesores y extensionistas tienen que enseñarlas a los productores.",
+      "Los productores para innovar necesitan recibir las tecnologías generadas por especialistas y empresas.",
+      "Los investigadores hacen aportes descontextualizados, poco útiles para los productores.",
+      "Los agroquímicos deben usarse con mucho cuidado: son tóxicos pero también son necesarios para conseguir una buena producción.",
+      "El rol de los extensionistas o asesores es acompañar el proceso de toma de decisiones de los productores.",
+      "Las mejores soluciones las encontramos discutiendo y trabajando con personas que tengan conocimientos y experiencias valiosas.",
+      "Los investigadores facilitan el trabajo del productor creando soluciones tecnológicas confiables.",
+      "Los productores son creativos y prueban constantemente nuevas estrategias y formas de trabajar y producir.",
+      "Para un buen asesor o extensionista, los conocimientos y experiencias de los productores son fundamentales.",
+      "Un buen vínculo entre productores y asesores o extensionistas, es más importante que la excelencia de las recomendaciones técnicas.",
+      "La innovación es el resultado de la transferencia de tecnología de expertos a productores.",
+      "La labor de los asesores y extensionistas debe partir de lo que le piden los productores.",
+      "Los investigadores tienen una mirada poco realista sobre cómo se produce.",
+      "Hay que usar herbicidas porque intentar ahorrar en los controles de malezas puede salir muy caro.",
+      "Tenemos que adoptar modelos que sean altamente productivos pero que a la vez sean amigables con la naturaleza.",
+      "Hay que imitar a la naturaleza, no se puede pretender máximos rindes en el corto plazo y cuidar el suelo al mismo tiempo."
+    ];
+
+    const estructura = [-4, -3, -2, -1, 0, 1, 2, 3, 4];
+    const espacios = [2, 3, 4, 4, 6, 4, 4, 3, 2];
+
+    const deposito = document.getElementById("deposito");
+    const grid = document.getElementById("grid");
+    let fraseActiva = null; 
+
+    // 1. Inicializar depósito
+    frases.forEach(texto => {
+      let div = document.createElement("div");
+      div.className = "phrase";
+      div.textContent = texto;
+      div.onclick = function(e) { manejarToqueFrase(this, e); };
+      deposito.appendChild(div);
+    });
+
+    // 2. Inicializar grilla
+    estructura.forEach((nombre, index) => {
+      const column = document.createElement("div");
+      column.className = "column";
+      const label = document.createElement("h3");
+      label.textContent = nombre;
+      column.appendChild(label);
+      
+      for (let i = 0; i < espacios[index]; i++) {
+        const slot = document.createElement("div");
+        slot.className = "slot";
+        slot.onclick = function(e) { manejarToqueSlot(this, e); };
+        column.appendChild(slot);
+      }
+      grid.appendChild(column);
+    });
+
+    // 3. Manejar toque en las frases
+    function manejarToqueFrase(elemento, event) {
+      event.stopPropagation(); // Evita que se dispare el click del casillero debajo
+
+      // Si tocamos la misma frase, la deseleccionamos
+      if (fraseActiva === elemento) {
+        elemento.classList.remove('selected');
+        fraseActiva = null;
+        return;
+      }
+
+      // Si tenemos una frase seleccionada y tocamos OTRA en la grilla, las intercambiamos
+      if (fraseActiva && elemento.parentElement.classList.contains('slot')) {
+        const slotDestino = elemento.parentElement;
+        const padreOrigen = fraseActiva.parentElement;
+        
+        slotDestino.appendChild(fraseActiva);
+        padreOrigen.appendChild(elemento);
+        
+        fraseActiva.classList.remove('selected');
+        fraseActiva = null;
+        return;
+      }
+
+      // Si no, simplemente seleccionamos la nueva
+      if (fraseActiva) fraseActiva.classList.remove('selected');
+      fraseActiva = elemento;
+      elemento.classList.add('selected');
+    }
+
+    // 4. Manejar toque en los casilleros (slots)
+    function manejarToqueSlot(slot, event) {
+      if (fraseActiva) {
+        if (!slot.hasChildNodes()) {
+          slot.appendChild(fraseActiva);
+        }
+        fraseActiva.classList.remove('selected');
+        fraseActiva = null;
+      }
+    }
+
+    // 5. Manejar toque en el fondo del depósito para devolver tarjetas
+    deposito.onclick = function(e) {
+      if (fraseActiva && (e.target === this)) {
+        this.appendChild(fraseActiva);
+        fraseActiva.classList.remove('selected');
+        fraseActiva = null;
+      }
+    };
+
+    function enviarDatos() {
+      const slots = document.querySelectorAll('.slot');
+      const posiciones = [];
+      let incompletas = false;
+
+      slots.forEach(slot => {
+        if (slot.firstChild) {
+          posiciones.push(slot.firstChild.textContent);
+        } else {
+          incompletas = true;
+        }
+      });
+
+      if (incompletas) {
+        alert("Por favor, ubicá las 32 frases en la grilla antes de guardar.");
+        return;
+      }
+
+      document.getElementById('btnEnviar').style.display = 'none';
+      document.getElementById('loading').style.display = 'block';
+
+      // =========================================================
+      // ACÁ ABAJO PEGÁ TU URL EXACTA DEL SCRIPT (Debe terminar en /exec)
+      // =========================================================
+      const urlWebAPP = "https://script.google.com/macros/s/AKfycbwVLk1KnjsjaQ2lJ2lZJ7bihsmAmQtmEfllbeqJysLtsDdfKqF1HY_bcBCf6F1gxph7Wg/exec"; 
+   
+      // Agregado el header text/plain para evitar bloqueos de seguridad de Google
+      fetch(urlWebAPP, {
+        method: 'POST',
+        body: JSON.stringify({ posiciones: posiciones }),
+        headers: { "Content-Type": "text/plain;charset=utf-8" } 
+      })
+      .then(response => response.json())
+      .then(data => {
+        if(data.status === "success") {
+          mostrarCodigoCorto(data.codigo);
+        } else {
+          mostrarError(data.mensaje);
+        }
+      })
+      .catch(error => {
+        console.error("Error al enviar:", error);
+        mostrarError("Error técnico. Chequeá que hayas pegado bien la URL y publicado como Nueva Versión.");
+      });
+    }
+
+    function mostrarCodigoCorto(codigo) {
+      document.getElementById('loading').style.display = 'none';
+      document.getElementById('resultado-container').style.display = 'block';
+      document.getElementById('codigo-resultado').textContent = codigo;
+    }
+
+    function mostrarError(mensaje) {
+      alert("Hubo un error al guardar: " + mensaje);
+      document.getElementById('btnEnviar').style.display = 'inline-block';
+      document.getElementById('loading').style.display = 'none';
+    }
+
+    function copiarCodigo() {
+      const codigo = document.getElementById('codigo-resultado').textContent;
+      navigator.clipboard.writeText(codigo).then(() => {
+        alert("¡Código copiado! Ya podés pegarlo en el Formulario.");
+      });
+    }
+  </script>
+</body>
+</html>
