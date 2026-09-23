@@ -13,7 +13,7 @@
       display: flex; flex-wrap: wrap; gap: 5px; justify-content: center;
       height: 280px; overflow-y: auto; padding: 10px;
       border: 2px dashed #999; background-color: #fff;
-      margin-bottom: 20px; align-content: flex-start;
+      margin-bottom: 20px; align-content: flex-start; cursor: pointer;
     }
     
     /* Contenedor de la grilla con scroll horizontal para móviles */
@@ -21,25 +21,25 @@
       width: 100%; overflow-x: auto; padding-bottom: 15px; margin-bottom: 20px;
     }
     
-    .grid { display: flex; gap: 3px; min-width: 950px; /* Asegura el ancho de las columnas */ }
+    .grid { display: flex; gap: 3px; min-width: 950px; }
     .column { display: flex; flex-direction: column; align-items: center; }
     
+    /* Casilleros más grandes que las frases para evitar cortes */
     .slot {
-      width: 100px; height: 75px; border: 2px dashed #ccc; margin: 1px;
+      width: 120px; height: 95px; border: 2px dashed #ccc; margin: 1px;
       display: flex; align-items: center; justify-content: center;
-      background-color: #f9f9f9; cursor: pointer; box-sizing: border-box;
+      background-color: #f9f9f9; cursor: pointer; box-sizing: border-box; padding: 2px;
     }
     
     /* Tarjetas de las frases */
     .phrase {
-      width: 110px; min-height: 65px; font-size: 9px; padding: 4px;
+      width: 110px; min-height: 85px; font-size: 9px; padding: 4px;
       background-color: #e3f2fd; border: 1px solid #1976d2; border-radius: 5px;
       cursor: pointer; user-select: none; display: flex; align-items: center;
       justify-content: center; text-align: center; line-height: 1.2;
-      box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+      box-shadow: 0 2px 4px rgba(0,0,0,0.1); box-sizing: border-box;
     }
     
-    /* Estado cuando se toca una tarjeta */
     .phrase.selected {
       background-color: #ffeb3b; border-color: #f57f17; transform: scale(1.05);
     }
@@ -53,9 +53,9 @@
 <body>
 
   <h2>
-    (1) Tocá una frase en el recuadro para seleccionarla (se pondrá amarilla).<br>
-    (2) Tocá un casillero vacío en la grilla abajo para ubicarla.<br>
-    (3) Si querés devolverla, tocala en la grilla.<br>
+    (1) Tocá una frase para seleccionarla (amarillo).<br>
+    (2) Tocá un casillero para ubicarla (o tocá otra tarjeta para intercambiarlas).<br>
+    (3) Para devolverla, tocala y luego tocá el fondo del recuadro punteado.<br>
     <small><i>Deslizá la grilla hacia los costados si no ves todas las columnas.</i></small>
   </h2>
 
@@ -77,7 +77,6 @@
   </div>
 
   <script>
-    // Tu lista original de 32 frases completas
     const frases = [
       "La confianza entre los productores y sus asesores o extensionistas es clave para obtener buenos resultados.",
       "Para innovar, es necesario debatir y pensar junto con personas que tengan distintas ideas y puntos de vista sobre el asunto.",
@@ -120,16 +119,16 @@
     const grid = document.getElementById("grid");
     let fraseActiva = null; 
 
-    // Inicializar depósito
+    // 1. Inicializar depósito
     frases.forEach(texto => {
       let div = document.createElement("div");
       div.className = "phrase";
       div.textContent = texto;
-      div.onclick = function() { manejarToqueFrase(this); };
+      div.onclick = function(e) { manejarToqueFrase(this, e); };
       deposito.appendChild(div);
     });
 
-    // Inicializar grilla
+    // 2. Inicializar grilla
     estructura.forEach((nombre, index) => {
       const column = document.createElement("div");
       column.className = "column";
@@ -140,37 +139,61 @@
       for (let i = 0; i < espacios[index]; i++) {
         const slot = document.createElement("div");
         slot.className = "slot";
-        slot.onclick = function() { manejarToqueSlot(this); };
+        slot.onclick = function(e) { manejarToqueSlot(this, e); };
         column.appendChild(slot);
       }
       grid.appendChild(column);
     });
 
-    function manejarToqueFrase(elemento) {
-      if (elemento.parentElement.classList.contains('slot')) {
-        deposito.appendChild(elemento);
-        if (fraseActiva === elemento) {
-          elemento.classList.remove('selected');
-          fraseActiva = null;
-        }
+    // 3. Manejar toque en las frases
+    function manejarToqueFrase(elemento, event) {
+      event.stopPropagation(); // Evita que se dispare el click del casillero debajo
+
+      // Si tocamos la misma frase, la deseleccionamos
+      if (fraseActiva === elemento) {
+        elemento.classList.remove('selected');
+        fraseActiva = null;
         return;
       }
-      if (fraseActiva) fraseActiva.classList.remove('selected');
-      if (fraseActiva !== elemento) {
-        fraseActiva = elemento;
-        elemento.classList.add('selected');
-      } else {
-        fraseActiva = null; 
+
+      // Si tenemos una frase seleccionada y tocamos OTRA en la grilla, las intercambiamos
+      if (fraseActiva && elemento.parentElement.classList.contains('slot')) {
+        const slotDestino = elemento.parentElement;
+        const padreOrigen = fraseActiva.parentElement;
+        
+        slotDestino.appendChild(fraseActiva);
+        padreOrigen.appendChild(elemento);
+        
+        fraseActiva.classList.remove('selected');
+        fraseActiva = null;
+        return;
       }
+
+      // Si no, simplemente seleccionamos la nueva
+      if (fraseActiva) fraseActiva.classList.remove('selected');
+      fraseActiva = elemento;
+      elemento.classList.add('selected');
     }
 
-    function manejarToqueSlot(slot) {
-      if (fraseActiva && !slot.hasChildNodes()) {
-        slot.appendChild(fraseActiva);
+    // 4. Manejar toque en los casilleros (slots)
+    function manejarToqueSlot(slot, event) {
+      if (fraseActiva) {
+        if (!slot.hasChildNodes()) {
+          slot.appendChild(fraseActiva);
+        }
         fraseActiva.classList.remove('selected');
         fraseActiva = null;
       }
     }
+
+    // 5. Manejar toque en el fondo del depósito para devolver tarjetas
+    deposito.onclick = function(e) {
+      if (fraseActiva && (e.target === this)) {
+        this.appendChild(fraseActiva);
+        fraseActiva.classList.remove('selected');
+        fraseActiva = null;
+      }
+    };
 
     function enviarDatos() {
       const slots = document.querySelectorAll('.slot');
@@ -193,15 +216,16 @@
       document.getElementById('btnEnviar').style.display = 'none';
       document.getElementById('loading').style.display = 'block';
 
-      // -------------------------------------------------------------
-      // ACÁ ABAJO VA LA URL QUE TE DIO GOOGLE APPS SCRIPT AL IMPLEMENTAR
-      // -------------------------------------------------------------
+      // =========================================================
+      // ACÁ ABAJO PEGÁ TU URL EXACTA DEL SCRIPT (Debe terminar en /exec)
+      // =========================================================
       const urlWebAPP = "https://script.google.com/macros/s/AKfycbyD8-7UbuwEAYs1O533usfmlq_4TQGDI0v-i8LFknMONizA5viN9NrBYv8YBCeyymsw/exec"; 
       
-      // Enviamos los datos mediante fetch puro sin depender del entorno de Google
+      // Agregado el header text/plain para evitar bloqueos de seguridad de Google
       fetch(urlWebAPP, {
         method: 'POST',
-        body: JSON.stringify({ posiciones: posiciones })
+        body: JSON.stringify({ posiciones: posiciones }),
+        headers: { "Content-Type": "text/plain;charset=utf-8" } 
       })
       .then(response => response.json())
       .then(data => {
@@ -213,7 +237,7 @@
       })
       .catch(error => {
         console.error("Error al enviar:", error);
-        mostrarError("Verificá tu conexión a internet e intentá nuevamente.");
+        mostrarError("Error técnico. Chequeá que hayas pegado bien la URL y publicado como Nueva Versión.");
       });
     }
 
